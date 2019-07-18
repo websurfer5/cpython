@@ -224,16 +224,21 @@ def _stat(fn):
 def _islink(fn):
     return fn.is_symlink() if isinstance(fn, os.DirEntry) else os.path.islink(fn)
 
-def copyfile(src, dst, *, follow_symlinks=True):
+def copyfile(src, dst, *, follow_symlinks=True, onerror=None):
     """Copy data from src to dst in the most efficient way possible.
 
     If follow_symlinks is not set and src is a symbolic link, a new
     symlink will be created instead of copying the file it points to.
 
+    If source and destination are the same file, a SameFileError will be
+    raised.
     """
     if _samefile(src, dst):
         raise SameFileError("{!r} and {!r} are the same file".format(src, dst))
 
+    if onerror is None:
+        def onerror(*args):
+            raise
     file_size = 0
     for i, fn in enumerate([src, dst]):
         try:
@@ -245,36 +250,54 @@ def copyfile(src, dst, *, follow_symlinks=True):
             # XXX What about other special files? (sockets, devices...)
             if stat.S_ISFIFO(st.st_mode):
                 fn = fn.path if isinstance(fn, os.DirEntry) else fn
-                raise SpecialFileError("`%s` is a named pipe" % fn)
+                try:
+                    raise SpecialFileError("`%s` is a named pipe" % fn)
+                except:
+                    onerror(os.lstat, src, dst, sys.exc_info())
             if _WINDOWS and i == 0:
                 file_size = st.st_size
 
     if not follow_symlinks and _islink(src):
-        os.symlink(os.readlink(src), dst)
+        try:
+            os.symlink(os.readlink(src), dst)
+        except:
+            onerror(os.symlink, src, dst, sys.exc_info())
     else:
-        with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst:
-            # macOS
-            if _HAS_FCOPYFILE:
-                try:
-                    _fastcopy_fcopyfile(fsrc, fdst, posix._COPYFILE_DATA)
+        try:
+            with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst:
+                # macOS
+                if _HAS_FCOPYFILE:
+                    try:
+                        _fastcopy_fcopyfile(fsrc, fdst, posix._COPYFILE_DATA)
+                        return dst
+                    except _GiveupOnFastCopy:
+                        pass
+                    except:
+                        onerror(posix._fcopyfile, src, dst, sys.exc_info())
+                # Linux
+                elif _USE_CP_SENDFILE:
+                    try:
+                        _fastcopy_sendfile(fsrc, fdst)
+                        return dst
+                    except _GiveupOnFastCopy:
+                        pass
+                    except:
+                        onerror(os.sendfile, src, dst, sys.exc_info())
+                # Windows, see:
+                # https://github.com/python/cpython/pull/7160#discussion_r195405230
+                elif _WINDOWS and file_size > 0:
+                    try:
+                        _copyfileobj_readinto(fsrc, fdst, min(file_size, COPY_BUFSIZE))
+                    except:
+                        onerror(io.readinto, src, dst, sys.exc_info())
                     return dst
-                except _GiveupOnFastCopy:
-                    pass
-            # Linux
-            elif _USE_CP_SENDFILE:
+
                 try:
-                    _fastcopy_sendfile(fsrc, fdst)
-                    return dst
-                except _GiveupOnFastCopy:
-                    pass
-            # Windows, see:
-            # https://github.com/python/cpython/pull/7160#discussion_r195405230
-            elif _WINDOWS and file_size > 0:
-                _copyfileobj_readinto(fsrc, fdst, min(file_size, COPY_BUFSIZE))
-                return dst
-
-            copyfileobj(fsrc, fdst)
-
+                    copyfileobj(fsrc, fdst)
+                except:
+                    onerror(shutil.copyfileobj, src, dst, sys.exc_info())
+        except:
+            onerror(open, src, dst, sys.exc_info())
     return dst
 
 def copymode(src, dst, *, follow_symlinks=True):
@@ -387,7 +410,7 @@ def copystat(src, dst, *, follow_symlinks=True):
             else:
                 raise
 
-def copy(src, dst, *, follow_symlinks=True):
+def copy(src, dst, *, follow_symlinks=True, onerror=None):
     """Copy data and mode bits ("cp src dst"). Return the file's destination.
 
     The destination may be a directory.
@@ -399,13 +422,16 @@ def copy(src, dst, *, follow_symlinks=True):
     raised.
 
     """
+    if onerror is None:
+        def onerror(*args):
+            raise
     if os.path.isdir(dst):
         dst = os.path.join(dst, os.path.basename(src))
-    copyfile(src, dst, follow_symlinks=follow_symlinks)
+    copyfile(src, dst, follow_symlinks=follow_symlinks, onerror=onerror)
     copymode(src, dst, follow_symlinks=follow_symlinks)
     return dst
 
-def copy2(src, dst, *, follow_symlinks=True):
+def copy2(src, dst, *, follow_symlinks=True, onerror=None):
     """Copy data and metadata. Return the file's destination.
 
     Metadata is copied with copystat(). Please see the copystat function
@@ -416,9 +442,12 @@ def copy2(src, dst, *, follow_symlinks=True):
     If follow_symlinks is false, symlinks won't be followed. This
     resembles GNU's "cp -P src dst".
     """
+    if onerror is None:
+        def onerror(*args):
+            raise
     if os.path.isdir(dst):
         dst = os.path.join(dst, os.path.basename(src))
-    copyfile(src, dst, follow_symlinks=follow_symlinks)
+    copyfile(src, dst, follow_symlinks=follow_symlinks, onerror=onerror)
     copystat(src, dst, follow_symlinks=follow_symlinks)
     return dst
 

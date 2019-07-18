@@ -1539,6 +1539,198 @@ class TestShutil(unittest.TestCase):
         rv = shutil.copytree(src_dir, dst_dir)
         self.assertEqual(['foo'], os.listdir(rv))
 
+    def test_copy_onerror_dst_file_not_writeable(self):
+        # Test that an error in copy_file() calls the onerror
+        # callback passed to copy().
+        errors = []
+        def _onerror(*args):
+            errors.append(args)
+        src_dir = self.mkdtemp()
+        dst_dir = self.mkdtemp()
+        dst_file = os.path.join(dst_dir, 'bar')
+        src_file = os.path.join(src_dir, 'foo')
+        write_file(src_file, 'foo')
+        write_file(dst_file, 'bar')
+        os.chmod(dst_file, 0)
+        shutil.copy(src_file, dst_file, onerror=_onerror)
+        self.assertEqual(len(errors), 1)
+        self.assertIs(errors[0][0], open)
+        self.assertEqual(errors[0][1], src_file)
+        self.assertEqual(errors[0][2], dst_file)
+        self.assertIsInstance(errors[0][3][1], PermissionError)
+
+    def test_copy_onerror_src_file_not_readeable(self):
+        # Test that an error in copy_file() calls the onerror
+        # callback passed to copy().
+        errors = []
+        def _onerror(*args):
+            errors.append(args)
+        src_dir = self.mkdtemp()
+        dst_dir = self.mkdtemp()
+        dst_file = os.path.join(dst_dir, 'bar')
+        src_file = os.path.join(src_dir, 'foo')
+        write_file(src_file, 'foo')
+        write_file(dst_file, 'bar')
+        os.chmod(src_file, 0)
+        shutil.copy(src_file, dst_file, onerror=_onerror)
+        self.assertEqual(len(errors), 1)
+        self.assertIs(errors[0][0], open)
+        self.assertEqual(errors[0][1], src_file)
+        self.assertEqual(errors[0][2], dst_file)
+        self.assertIsInstance(errors[0][3][1], PermissionError)
+
+    def test_copy2_onerror_dst_file_not_writeable(self):
+        # Test that an error in copy_file() calls the onerror
+        # callback passed to copy().
+        errors = []
+        def _onerror(*args):
+            errors.append(args)
+        src_dir = self.mkdtemp()
+        dst_dir = self.mkdtemp()
+        dst_file = os.path.join(dst_dir, 'bar')
+        src_file = os.path.join(src_dir, 'foo')
+        write_file(src_file, 'foo')
+        write_file(dst_file, 'bar')
+        os.chmod(dst_file, 0)
+        shutil.copy2(src_file, dst_file, onerror=_onerror)
+        self.assertEqual(len(errors), 1)
+        self.assertIs(errors[0][0], open)
+        self.assertEqual(errors[0][1], src_file)
+        self.assertEqual(errors[0][2], dst_file)
+        self.assertIsInstance(errors[0][3][1], PermissionError)
+
+    def test_copy2_onerror_src_file_not_readeable(self):
+        # Test that an error in copy_file() calls the onerror
+        # callback passed to copy().
+        errors = []
+        def _onerror(*args):
+            errors.append(args)
+        src_dir = self.mkdtemp()
+        dst_dir = self.mkdtemp()
+        dst_file = os.path.join(dst_dir, 'bar')
+        src_file = os.path.join(src_dir, 'foo')
+        write_file(src_file, 'foo')
+        write_file(dst_file, 'bar')
+        os.chmod(src_file, 0)
+        shutil.copy2(src_file, dst_file, onerror=_onerror)
+        self.assertEqual(len(errors), 1)
+        self.assertIs(errors[0][0], open)
+        self.assertEqual(errors[0][1], src_file)
+        self.assertEqual(errors[0][2], dst_file)
+        self.assertIsInstance(errors[0][3][1], PermissionError)
+
+    def test_copyfile_onerror_dst_file_not_writeable(self):
+        # Test that an error in copy_file() calls the onerror
+        # callback passed to copy().
+        errors = []
+        def _onerror(*args):
+            errors.append(args)
+        src_dir = self.mkdtemp()
+        dst_dir = self.mkdtemp()
+        dst_file = os.path.join(dst_dir, 'bar')
+        src_file = os.path.join(src_dir, 'foo')
+        write_file(src_file, 'foo')
+        write_file(dst_file, 'bar')
+        os.chmod(dst_file, 0)
+        shutil.copyfile(src_file, dst_file, onerror=_onerror)
+        self.assertEqual(len(errors), 1)
+        self.assertIs(errors[0][0], open)
+        self.assertEqual(errors[0][1], src_file)
+        self.assertEqual(errors[0][2], dst_file)
+        self.assertIsInstance(errors[0][3][1], PermissionError)
+
+    def test_copyfile_onerror_src_file_not_readable(self):
+        # Test that an error in copy_file() calls the onerror
+        # callback passed to copy().
+        errors = []
+        def _onerror(*args):
+            errors.append(args)
+        src_dir = self.mkdtemp()
+        dst_dir = self.mkdtemp()
+        dst_file = os.path.join(dst_dir, 'bar')
+        src_file = os.path.join(src_dir, 'foo')
+        write_file(src_file, 'foo')
+        write_file(dst_file, 'bar')
+        os.chmod(src_file, 0)
+        shutil.copyfile(src_file, dst_file, onerror=_onerror)
+        self.assertEqual(len(errors), 1)
+        self.assertIs(errors[0][0], open)
+        self.assertEqual(errors[0][1], src_file)
+        self.assertEqual(errors[0][2], dst_file)
+        self.assertIsInstance(errors[0][3][1], PermissionError)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), 'requires os.mkfifo()')
+    def test_copyfile_onerror_named_pipe(self):
+        # Test that a named pipe (source or destination)
+        # triggers a call to onerror.
+        try:
+            os.mkfifo(TESTFN)
+        except PermissionError as e:
+            self.skipTest('os.mkfifo(): %s' % e)
+        errors = []
+        def _onerror(*args):
+            errors.append(args)
+            raise
+        try:
+            shutil.copyfile(TESTFN, TESTFN2, onerror=_onerror)
+        except:
+            pass
+        try:
+            shutil.copyfile(__file__, TESTFN, onerror=_onerror)
+        except:
+            pass
+        try:
+            self.assertEqual(len(errors), 2)
+            self.assertIs(errors[0][0], os.lstat)
+            self.assertEqual(errors[0][1], TESTFN)
+            self.assertEqual(errors[0][2], TESTFN2)
+            self.assertIsInstance(errors[0][3][1], shutil.SpecialFileError)
+            self.assertIs(errors[1][0], os.lstat)
+            self.assertEqual(errors[1][1], __file__)
+            self.assertEqual(errors[1][2], TESTFN)
+            self.assertIsInstance(errors[1][3][1], shutil.SpecialFileError)
+        finally:
+            os.remove(TESTFN)
+
+    @support.skip_unless_symlink
+    def test_copyfile_onerror_symlinks(self):
+        tmp_dir = self.mkdtemp()
+        src = os.path.join(tmp_dir, 'src')
+        dst = os.path.join(tmp_dir, 'dst')
+        src_link = os.path.join(tmp_dir, 'dst_link')
+        link = os.path.join(tmp_dir, 'link')
+        write_file(src, 'foo')
+        write_file(dst, 'bar')
+        os.symlink(src, link)
+        errors = []
+        def _onerror(*args):
+            errors.append(args)
+            raise
+
+        # don't follow symlink and induce error on new symlink creation
+        try:
+            shutil.copyfile(link, dst, follow_symlinks=False, onerror=_onerror)
+        except:
+            pass
+
+        # follow symlink and induce error and induce error
+        # when opening destination
+
+        os.chmod(dst, 0)
+        try:
+            shutil.copyfile(link, dst, follow_symlinks=True, onerror=_onerror)
+        except:
+            pass        
+
+        self.assertEqual(len(errors), 2)
+        self.assertIs(errors[0][0], os.symlink)
+        self.assertEqual(errors[0][1], link)
+        self.assertEqual(errors[0][2], dst)
+        self.assertIsInstance(errors[0][3][1], FileExistsError)
+        self.assertIs(errors[1][0], open)
+        self.assertEqual(errors[1][1], link)
+        self.assertEqual(errors[1][2], dst)
+        self.assertIsInstance(errors[1][3][1], PermissionError)
 
 class TestWhich(unittest.TestCase):
 
