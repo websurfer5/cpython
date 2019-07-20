@@ -355,9 +355,9 @@ if hasattr(os, 'listxattr'):
             except OSError as e:
                 if e.errno not in (errno.EPERM, errno.ENOTSUP, errno.ENODATA,
                                    errno.EINVAL):
-                    onerror(os.getxattr, src, dst, einfo)
+                    onerror(os.getxattr, src, dst, sys.exc_info())
             except:
-                onerror(os.getxattr, src, dst, einfo)
+                onerror(os.getxattr, src, dst, sys.exc_info())
 else:
     def _copyxattr(*args, **kwargs):
         pass

@@ -549,20 +549,33 @@ class TestShutil(unittest.TestCase):
             shutil.copystat(src, dst, follow_symlinks=True, onerror=_onerror)
         except:
             raise
-        self.assertEqual(len(errors), 3 if MACOS else 2)
-        self.assertIs(errors[0][0], os.utime)
-        self.assertEqual(errors[0][1], src)
-        self.assertEqual(errors[0][2], dst)
-        self.assertIsInstance(errors[0][3][1], FileNotFoundError)
-        self.assertIs(errors[1][0], os.chmod)
-        self.assertEqual(errors[1][1], src)
-        self.assertEqual(errors[1][2], dst)
-        self.assertIsInstance(errors[1][3][1], FileNotFoundError)
+        has_listxattr = hasattr(os, 'listxattr')
+        expected_errors = 3 if MACOS or has_listxattr else 2
+        i = 0
+        self.assertEqual(len(errors), expected_errors)
+        self.assertIs(errors[i][0], os.utime)
+        self.assertEqual(errors[i][1], src)
+        self.assertEqual(errors[i][2], dst)
+        self.assertIsInstance(errors[i][3][1], FileNotFoundError)
+        i = i + 1
+        if has_listxattr:
+            self.assertIs(errors[i][0], os.getxattr)
+            self.assertEqual(errors[i][1], src)
+            self.assertEqual(errors[i][2], dst)
+            self.assertIsInstance(errors[i][3][1], FileNotFoundError)
+            i = i + 1
+        self.assertIs(errors[i][0], os.chmod)
+        self.assertEqual(errors[i][1], src)
+        self.assertEqual(errors[i][2], dst)
+        self.assertIsInstance(errors[i][3][1], FileNotFoundError)
+        i = i + 1
         if MACOS:
-            self.assertIs(errors[2][0], os.chflags)
-            self.assertEqual(errors[2][1], src)
-            self.assertEqual(errors[2][2], dst)
-            self.assertIsInstance(errors[2][3][1], FileNotFoundError)
+            self.assertIs(errors[i][0], os.chflags)
+            self.assertEqual(errors[i][1], src)
+            self.assertEqual(errors[i][2], dst)
+            self.assertIsInstance(errors[i][3][1], FileNotFoundError)
+            i = i + 1
+        self.assertEqual(i, expected_errors)
 
     @support.skip_unless_xattr
     def test_copyxattr(self):
