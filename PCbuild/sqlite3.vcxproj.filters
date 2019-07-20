@@ -21,7 +21,4 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="..\PC\sqlite3.rc" />
-  </ItemGroup>
 </Project>
