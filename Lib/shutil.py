@@ -362,7 +362,7 @@ else:
     def _copyxattr(*args, **kwargs):
         pass
 
-def copystat(src, dst, *, follow_symlinks=True):
+def copystat(src, dst, *, follow_symlinks=True, onerror=None):
     """Copy file metadata
 
     Copy the permission bits, last access time, last modification time, and
@@ -373,6 +373,10 @@ def copystat(src, dst, *, follow_symlinks=True):
     If the optional flag `follow_symlinks` is not set, symlinks aren't
     followed if and only if both `src` and `dst` are symlinks.
     """
+    if onerror is None:
+        def onerror(*args):
+            raise
+
     def _nop(*args, ns=None, follow_symlinks=None):
         pass
 
@@ -391,39 +395,49 @@ def copystat(src, dst, *, follow_symlinks=True):
                 return fn
             return _nop
 
-    if isinstance(src, os.DirEntry):
-        st = src.stat(follow_symlinks=follow)
-    else:
-        st = lookup("stat")(src, follow_symlinks=follow)
-    mode = stat.S_IMODE(st.st_mode)
-    lookup("utime")(dst, ns=(st.st_atime_ns, st.st_mtime_ns),
-        follow_symlinks=follow)
-    # We must copy extended attributes before the file is (potentially)
-    # chmod()'ed read-only, otherwise setxattr() will error with -EACCES.
-    _copyxattr(src, dst, follow_symlinks=follow)
     try:
-        lookup("chmod")(dst, mode, follow_symlinks=follow)
-    except NotImplementedError:
-        # if we got a NotImplementedError, it's because
-        #   * follow_symlinks=False,
-        #   * lchown() is unavailable, and
-        #   * either
-        #       * fchownat() is unavailable or
-        #       * fchownat() doesn't implement AT_SYMLINK_NOFOLLOW.
-        #         (it returned ENOSUP.)
-        # therefore we're out of options--we simply cannot chown the
-        # symlink.  give up, suppress the error.
-        # (which is what shutil always did in this circumstance.)
-        pass
-    if hasattr(st, 'st_flags'):
+        if isinstance(src, os.DirEntry):
+            st = src.stat(follow_symlinks=follow)
+        else:
+            st = lookup("stat")(src, follow_symlinks=follow)
+        mode = stat.S_IMODE(st.st_mode)
         try:
-            lookup("chflags")(dst, st.st_flags, follow_symlinks=follow)
-        except OSError as why:
-            for err in 'EOPNOTSUPP', 'ENOTSUP':
-                if hasattr(errno, err) and why.errno == getattr(errno, err):
-                    break
-            else:
-                raise
+            lookup("utime")(dst, ns=(st.st_atime_ns, st.st_mtime_ns),
+                follow_symlinks=follow)
+        except:
+            onerror(os.utime, src, dst, sys.exc_info())
+        # We must copy extended attributes before the file is (potentially)
+        # chmod()'ed read-only, otherwise setxattr() will error with -EACCES.
+        _copyxattr(src, dst, follow_symlinks=follow, onerror=onerror)
+        try:
+            lookup("chmod")(dst, mode, follow_symlinks=follow)
+        except NotImplementedError:
+            # if we got a NotImplementedError, it's because
+            #   * follow_symlinks=False,
+            #   * lchown() is unavailable, and
+            #   * either
+            #       * fchownat() is unavailable or
+            #       * fchownat() doesn't implement AT_SYMLINK_NOFOLLOW.
+            #         (it returned ENOSUP.)
+            # therefore we're out of options--we simply cannot chown the
+            # symlink.  give up, suppress the error.
+            # (which is what shutil always did in this circumstance.)
+            pass
+        except:
+            onerror(os.chmod, src, dst, sys.exc_info())
+        if hasattr(st, 'st_flags'):
+            try:
+                lookup("chflags")(dst, st.st_flags, follow_symlinks=follow)
+            except OSError as why:
+                for err in 'EOPNOTSUPP', 'ENOTSUP':
+                    if hasattr(errno, err) and why.errno == getattr(errno, err):
+                        break
+                else:
+                    onerror(os.chflags, src, dst, sys.exc_info())
+            except:
+                onerror(os.chmod, src, dst, sys.exc_info())
+    except:
+        onerror(os.stat, src, dst, sys.exc_info())
 
 def copy(src, dst, *, follow_symlinks=True, onerror=None):
     """Copy data and mode bits ("cp src dst"). Return the file's destination.
@@ -456,6 +470,9 @@ def copy2(src, dst, *, follow_symlinks=True, onerror=None):
 
     If follow_symlinks is false, symlinks won't be followed. This
     resembles GNU's "cp -P src dst".
+
+    If source and destination are the same file, a SameFileError will be
+    raised.
     """
     if onerror is None:
         def onerror(*args):
@@ -463,7 +480,7 @@ def copy2(src, dst, *, follow_symlinks=True, onerror=None):
     if os.path.isdir(dst):
         dst = os.path.join(dst, os.path.basename(src))
     copyfile(src, dst, follow_symlinks=follow_symlinks, onerror=onerror)
-    copystat(src, dst, follow_symlinks=follow_symlinks)
+    copystat(src, dst, follow_symlinks=follow_symlinks, onerror=onerror)
     return dst
 
 def ignore_patterns(*patterns):

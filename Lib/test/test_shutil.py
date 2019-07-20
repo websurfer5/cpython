@@ -519,6 +519,50 @@ class TestShutil(unittest.TestCase):
         finally:
             os.chflags = old_chflags
 
+    def test_copystat_onerror_missing_src(self):
+        tmp_dir = self.mkdtemp()
+        src = os.path.join(tmp_dir, 'foo')
+        dst = os.path.join(tmp_dir, 'bar')
+        errors = []
+        def _onerror(*args):
+            errors.append(args)
+        try:
+            shutil.copystat(src, dst, follow_symlinks=True, onerror=_onerror)
+        except:
+            raise
+        self.assertEqual(len(errors), 1)
+        self.assertIs(errors[0][0], os.stat)
+        self.assertEqual(errors[0][1], src)
+        self.assertEqual(errors[0][2], dst)
+        self.assertIsInstance(errors[0][3][1], FileNotFoundError)
+
+    def test_copystat_onerror_missing_dst(self):
+        tmp_dir = self.mkdtemp()
+        src = os.path.join(tmp_dir, 'foo')
+        dst = os.path.join(tmp_dir, 'bar')
+        write_file(src, 'foo')
+        errors = []
+        def _onerror(*args):
+            errors.append(args)
+            pass
+        try:
+            shutil.copystat(src, dst, follow_symlinks=True, onerror=_onerror)
+        except:
+            raise
+        self.assertEqual(len(errors), 3)
+        self.assertIs(errors[0][0], os.utime)
+        self.assertEqual(errors[0][1], src)
+        self.assertEqual(errors[0][2], dst)
+        self.assertIsInstance(errors[0][3][1], FileNotFoundError)
+        self.assertIs(errors[1][0], os.chmod)
+        self.assertEqual(errors[1][1], src)
+        self.assertEqual(errors[1][2], dst)
+        self.assertIsInstance(errors[1][3][1], FileNotFoundError)
+        self.assertIs(errors[2][0], os.chflags)
+        self.assertEqual(errors[2][1], src)
+        self.assertEqual(errors[2][2], dst)
+        self.assertIsInstance(errors[2][3][1], FileNotFoundError)
+
     @support.skip_unless_xattr
     def test_copyxattr(self):
         tmp_dir = self.mkdtemp()
