@@ -430,6 +430,25 @@ class TestShutil(unittest.TestCase):
         self.assertEqual(errors[0][2], dst)
         self.assertIsInstance(errors[0][3][1], FileNotFoundError)
 
+    def test_copymode_onerror_missing_dst(self):
+        tmp_dir = self.mkdtemp()
+        src = os.path.join(tmp_dir, 'foo')
+        dst = os.path.join(tmp_dir, 'bar')
+        write_file(src, 'foo')
+        errors = []
+        def _onerror(*args):
+            errors.append(args)
+            pass
+        try:
+            shutil.copymode(src, dst, follow_symlinks=True, onerror=_onerror)
+        except:
+            raise
+        self.assertEqual(len(errors), 1)
+        self.assertIs(errors[0][0], os.stat)
+        self.assertEqual(errors[0][1], src)
+        self.assertEqual(errors[0][2], dst)
+        self.assertIsInstance(errors[0][3][1], FileNotFoundError)
+
     @support.skip_unless_symlink
     def test_copystat_symlinks(self):
         tmp_dir = self.mkdtemp()
