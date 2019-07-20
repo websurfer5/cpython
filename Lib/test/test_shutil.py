@@ -549,10 +549,15 @@ class TestShutil(unittest.TestCase):
             shutil.copystat(src, dst, follow_symlinks=True, onerror=_onerror)
         except:
             raise
+        has_chflags = hasattr(os, 'chflags')
         has_listxattr = hasattr(os, 'listxattr')
-        expected_errors = 3 if MACOS or has_listxattr else 2
+        num_errors = 2
+        if has_chflags:
+            num_errors = num_errors + 1
+        if has_listxattr:
+            num_errors = num_errors + 1
         i = 0
-        self.assertEqual(len(errors), expected_errors)
+        self.assertEqual(len(errors), num_errors)
         self.assertIs(errors[i][0], os.utime)
         self.assertEqual(errors[i][1], src)
         self.assertEqual(errors[i][2], dst)
@@ -569,13 +574,13 @@ class TestShutil(unittest.TestCase):
         self.assertEqual(errors[i][2], dst)
         self.assertIsInstance(errors[i][3][1], FileNotFoundError)
         i = i + 1
-        if MACOS:
+        if has_chflags:
             self.assertIs(errors[i][0], os.chflags)
             self.assertEqual(errors[i][1], src)
             self.assertEqual(errors[i][2], dst)
             self.assertIsInstance(errors[i][3][1], FileNotFoundError)
             i = i + 1
-        self.assertEqual(i, expected_errors)
+        self.assertEqual(i, num_errors)
 
     @support.skip_unless_xattr
     def test_copyxattr(self):
