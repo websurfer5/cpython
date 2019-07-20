@@ -549,7 +549,7 @@ class TestShutil(unittest.TestCase):
             shutil.copystat(src, dst, follow_symlinks=True, onerror=_onerror)
         except:
             raise
-        self.assertEqual(len(errors), 3)
+        self.assertEqual(len(errors), 3 if MACOS else 2)
         self.assertIs(errors[0][0], os.utime)
         self.assertEqual(errors[0][1], src)
         self.assertEqual(errors[0][2], dst)
@@ -558,10 +558,11 @@ class TestShutil(unittest.TestCase):
         self.assertEqual(errors[1][1], src)
         self.assertEqual(errors[1][2], dst)
         self.assertIsInstance(errors[1][3][1], FileNotFoundError)
-        self.assertIs(errors[2][0], os.chflags)
-        self.assertEqual(errors[2][1], src)
-        self.assertEqual(errors[2][2], dst)
-        self.assertIsInstance(errors[2][3][1], FileNotFoundError)
+        if MACOS:
+            self.assertIs(errors[2][0], os.chflags)
+            self.assertEqual(errors[2][1], src)
+            self.assertEqual(errors[2][2], dst)
+            self.assertIsInstance(errors[2][3][1], FileNotFoundError)
 
     @support.skip_unless_xattr
     def test_copyxattr(self):
