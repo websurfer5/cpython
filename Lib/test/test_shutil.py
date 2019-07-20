@@ -1577,6 +1577,7 @@ class TestShutil(unittest.TestCase):
         self.assertEqual(errors[0][2], dst_file)
         self.assertIsInstance(errors[0][3][1], PermissionError)
 
+    @unittest.skipIf(sys.platform == "win32", 'test does not work on Windows')
     def test_copy_onerror_src_file_not_readeable(self):
         # Test that an error in copy_file() calls the onerror
         # callback passed to copy().
@@ -1617,6 +1618,7 @@ class TestShutil(unittest.TestCase):
         self.assertEqual(errors[0][2], dst_file)
         self.assertIsInstance(errors[0][3][1], PermissionError)
 
+    @unittest.skipIf(sys.platform == "win32", 'test does not work on Windows')
     def test_copy2_onerror_src_file_not_readeable(self):
         # Test that an error in copy_file() calls the onerror
         # callback passed to copy().
@@ -1657,6 +1659,7 @@ class TestShutil(unittest.TestCase):
         self.assertEqual(errors[0][2], dst_file)
         self.assertIsInstance(errors[0][3][1], PermissionError)
 
+    @unittest.skipIf(sys.platform == "win32", 'test does not work on Windows')
     def test_copyfile_onerror_src_file_not_readable(self):
         # Test that an error in copy_file() calls the onerror
         # callback passed to copy().
