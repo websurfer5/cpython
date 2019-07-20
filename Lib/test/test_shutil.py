@@ -549,13 +549,16 @@ class TestShutil(unittest.TestCase):
             shutil.copystat(src, dst, follow_symlinks=True, onerror=_onerror)
         except:
             raise
-        has_chflags = hasattr(os, 'chflags')
-        has_listxattr = hasattr(os, 'listxattr')
         num_errors = 2
+        has_chflags = hasattr(os, 'chflags')
         if has_chflags:
             num_errors = num_errors + 1
-        if has_listxattr:
-            num_errors = num_errors + 1
+        has_xatrrs = hasattr(os, 'listxattr')
+        if has_xatrrs:
+            if len(os.listxattr(src, follow_symlinks=True)) > 0:
+                num_errors = num_errors + 1
+            else:
+                has_xatrrs = False
         i = 0
         self.assertEqual(len(errors), num_errors)
         self.assertIs(errors[i][0], os.utime)
@@ -563,7 +566,7 @@ class TestShutil(unittest.TestCase):
         self.assertEqual(errors[i][2], dst)
         self.assertIsInstance(errors[i][3][1], FileNotFoundError)
         i = i + 1
-        if has_listxattr:
+        if has_xatrrs:
             self.assertIs(errors[i][0], os.getxattr)
             self.assertEqual(errors[i][1], src)
             self.assertEqual(errors[i][2], dst)
