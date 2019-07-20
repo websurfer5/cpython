@@ -300,7 +300,7 @@ def copyfile(src, dst, *, follow_symlinks=True, onerror=None):
             onerror(open, src, dst, sys.exc_info())
     return dst
 
-def copymode(src, dst, *, follow_symlinks=True):
+def copymode(src, dst, *, follow_symlinks=True, onerror=None):
     """Copy mode bits from src to dst.
 
     If follow_symlinks is not set, symlinks aren't followed if and only
@@ -316,11 +316,20 @@ def copymode(src, dst, *, follow_symlinks=True):
     else:
         stat_func, chmod_func = _stat, os.chmod
 
-    st = stat_func(src)
-    chmod_func(dst, stat.S_IMODE(st.st_mode))
+    if onerror is None:
+        def onerror(*args):
+            raise
+    try:
+        st = stat_func(src)
+        chmod_func(dst, stat.S_IMODE(st.st_mode))
+    except:
+        # any errors that may be raised by chmod_func will be
+        # raised by stat_func first.
+        onerror(os.stat if stat_func is _stat else os.lstat,
+                src, dst, sys.exc_info())
 
 if hasattr(os, 'listxattr'):
-    def _copyxattr(src, dst, *, follow_symlinks=True):
+    def _copyxattr(src, dst, *, follow_symlinks=True, onerror=None):
         """Copy extended filesystem attributes from `src` to `dst`.
 
         Overwrite existing attributes.
@@ -328,13 +337,17 @@ if hasattr(os, 'listxattr'):
         If `follow_symlinks` is false, symlinks won't be followed.
 
         """
-
+        if onerror is None:
+            def onerror(*args):
+                raise
         try:
             names = os.listxattr(src, follow_symlinks=follow_symlinks)
         except OSError as e:
             if e.errno not in (errno.ENOTSUP, errno.ENODATA, errno.EINVAL):
-                raise
+                onerror(os.listxattr, src, dst, sys.exc_info())
             return
+        except:
+            onerror(os.listxattr, src, dst, sys.exc_info())
         for name in names:
             try:
                 value = os.getxattr(src, name, follow_symlinks=follow_symlinks)
@@ -342,7 +355,9 @@ if hasattr(os, 'listxattr'):
             except OSError as e:
                 if e.errno not in (errno.EPERM, errno.ENOTSUP, errno.ENODATA,
                                    errno.EINVAL):
-                    raise
+                    onerror(os.getxattr, src, dst, einfo)
+            except:
+                onerror(os.getxattr, src, dst, einfo)
 else:
     def _copyxattr(*args, **kwargs):
         pass
@@ -428,7 +443,7 @@ def copy(src, dst, *, follow_symlinks=True, onerror=None):
     if os.path.isdir(dst):
         dst = os.path.join(dst, os.path.basename(src))
     copyfile(src, dst, follow_symlinks=follow_symlinks, onerror=onerror)
-    copymode(src, dst, follow_symlinks=follow_symlinks)
+    copymode(src, dst, follow_symlinks=follow_symlinks, onerror=onerror)
     return dst
 
 def copy2(src, dst, *, follow_symlinks=True, onerror=None):
