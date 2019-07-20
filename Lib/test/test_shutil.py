@@ -546,7 +546,7 @@ class TestShutil(unittest.TestCase):
             errors.append(args)
             pass
         try:
-            shutil.copystat(src, dst, follow_symlinks=True, onerror=_onerror)
+            shutil.copystat(src, dst, follow_symlinks=False, onerror=_onerror)
         except:
             raise
         num_errors = 2
@@ -555,7 +555,7 @@ class TestShutil(unittest.TestCase):
             num_errors = num_errors + 1
         has_xatrrs = hasattr(os, 'listxattr')
         if has_xatrrs:
-            if len(os.listxattr(src, follow_symlinks=True)) > 0:
+            if len(os.listxattr(src, follow_symlinks=False)) > 0:
                 num_errors = num_errors + 1
             else:
                 has_xatrrs = False
